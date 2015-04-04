@@ -1,10 +1,20 @@
-The Dining Room
- 012345678
-0wwwwwwwww
-1w       w
-2w       w
-3w       w
-4w  b    w
-5w       w
-6w    b  w
-7wwwwwwwww
+{
+	"world": "My first world",
+	"rooms": [
+		{
+			"roomId": 1,
+			"name": "The Dining Room",
+			"rows": [
+				" 012345678",
+				"0wwwwwwwww",
+				"1w       w",
+				"2w       w",
+				"3w       w",
+				"4w  b    w",
+				"5w       w",
+				"6w    b  w",
+				"7wwwwwwwww"
+			]
+		}
+	]
+}

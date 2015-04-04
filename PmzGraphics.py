@@ -33,6 +33,54 @@ class Backgrounds:
                 #print("Set tileId '"+str(tileId)+"' is",self.map[tileId].filename)
 
 
+# Keep track of wanting to draw a sprite at a place on the screen
+class DrawTask:
+    def __init__(self, sprite, x, y):
+        self.sprite = sprite
+        self.x = x
+        self.y = y
+
+    def apply(self, screen):
+        screen.blit(self.sprite.img, self.sprite.rect.move(self.x, self.y))
+
+
+# Keep track of wanting to undraw a rectangle on the screen
+class UndrawTask:
+    def __init__(self, x, y, w, h):
+        self.x = x
+        self.y = y
+        self.w = w
+        self.h = h
+
+    def apply(self, screen, bgScreen):
+        try:
+            bgImg = bgScreen.subsurface(pygame.Rect(self.x, self.y, self.w, self.h))
+            screen.blit(bgImg, pygame.Rect(self.x, self.y, bgImg.get_rect().width, bgImg.get_rect().height))
+        except ValueError as e:
+            print('Failed with',e,'with',self.x,self.y,self.w,self.h)
+        
+
+# Keep track of what redraws we want to do, apply() will actually draw them (in the right order)
+class RedrawsRequired:
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.bgRedraws = []
+        self.fgRedraws = []
+
+    def addFg(self, task):
+        self.fgRedraws.append(task)
+
+    def addBg(self, task):
+        self.bgRedraws.append(task)
+
+    def apply(self, screen, bgScreen):
+        for x in self.bgRedraws: x.apply(screen, bgScreen)
+        for x in self.fgRedraws: x.apply(screen)
+        self.reset()
+        
+
 
 def drawBackground(screen, backgrounds, room):
     black = 255, 255, 0
