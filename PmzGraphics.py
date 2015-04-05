@@ -83,7 +83,7 @@ class RedrawsRequired:
 
 
 def drawBackground(screen, backgrounds, room):
-    black = 255, 255, 0
+    black = 0, 0, 0
     screen.fill(black)
     for x in range(0, 9):
         for y in range(0, 8):

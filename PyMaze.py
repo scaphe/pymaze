@@ -1,10 +1,11 @@
 # Maze written using pygame
 
 import sys, pygame, time, json, pprint
-
+import queue
 
 from PmzGraphics import *
 from GameController import *
+
 
 
 # Immutable (nice callers respecting my underscores) position
@@ -25,37 +26,36 @@ class Pos:
     def isEmpty(self): return self._x == 0 and self._y == 0
 
 
-# Action states
-class Action:
-    INIT = -1
-    NONE = 0
-    MOVE_RIGHT = 1
-    MOVE_LEFT = 2
-    MOVE_UP = 3
-    MOVE_DOWN = 4
-
-    def __init__(self):
-        pass
-
 
 class Player():
-    def __init__(self, sprite, xpos, ypos):
+    def __init__(self, playerId, isLocal, sprite, xpos, ypos):
+        self.playerId = playerId
+        self.isLocal = isLocal
         self._animating = 0
         self.sprite = sprite
-        self._needDraw = True
+        self._applyingAction = True
         self._pos = Pos(xpos, ypos)
-        self.xpos = xpos
-        self.ypos = ypos
         self.xoff = 0
         self.yoff = 0
         self.w = sprite.w
         self.h = sprite.h
+        self._pendingAction = Action.NONE
         print('Got h of',self.h)
 
     def isBusy(self):
-        self.animating = 0
+        return self._animating != 0
 
     def takeAction(self, action):
+        print('takeAction called with',action)
+        self._pendingAction = action
+        if not self.isBusy():
+            self._applyPendingAction()
+
+    def _applyPendingAction(self):
+        action = self._pendingAction
+        # TODO: Check if the user is holding down a key
+        #if action == Action.NONE:
+
         if action == Action.MOVE_RIGHT: self._aniDelta = Pos(1, 0)
         elif action == Action.MOVE_LEFT: self._aniDelta = Pos(-1, 0)
         elif action == Action.MOVE_UP: self._aniDelta = Pos(0, -1)
@@ -67,11 +67,13 @@ class Player():
             # We are going to animate from the current position to the new position
             self._animating = 20
             self._aniAction = action
-            self._needDraw = True
+            self._applyingAction = True
             self._aniPos = self._pos
             self._pos = self._pos.plus(self._aniDelta)
             self.xoff = 0
             self.yoff = 0
+            # Consumed this action now
+            self._pendingAction = Action.NONE
         else:
             print('No move cos',action,' so using', self._aniDelta)
 
@@ -95,23 +97,28 @@ class Player():
             self._animating -= 1
             self.animate(rr)
         else:
-            if self._needDraw:
+            if self._applyingAction:
                 self.xoff = 0
                 self.yoff = 0
-                print('Drawing at',self._pos)
                 rr.addFg(DrawTask(self.sprite, self.makeX(self._pos), self.makeY(self._pos)))
-                self._needDraw = False
+                self._applyingAction = False
+                self._applyPendingAction()
 
     def makeX(self, pos): return pos.x() * 100  + self.xoff
                  
     def makeY(self, pos): return pos.y() * 80   + self.yoff-40
         
     def actionFromKey(self, k):
-        if k == pygame.K_x: return Action.MOVE_RIGHT
-        elif k == pygame.K_z: return Action.MOVE_LEFT
-        elif k == pygame.K_k: return Action.MOVE_UP
-        elif k == pygame.K_m: return Action.MOVE_DOWN
+        if k == self.rightKey(): return Action.MOVE_RIGHT
+        elif k == self.leftKey(): return Action.MOVE_LEFT
+        elif k == self.upKey(): return Action.MOVE_UP
+        elif k == self.downKey(): return Action.MOVE_DOWN
         else: return Action.NONE
+
+    def leftKey(self): return pygame.K_z
+    def rightKey(self): return pygame.K_x
+    def upKey(self): return pygame.K_k
+    def downKey(self): return pygame.K_m
 
 
 
@@ -165,6 +172,12 @@ class World:
         rr.apply(self.screen, self.bgScreen)
         pygame.display.flip()
 
+    def processQueuedActions(self, gameQueue):
+        while not gameQueue.empty():
+            ev = gameQueue.get()
+            player = next((x for x in self.players if x.playerId == ev.playerId), None)
+            player.takeAction(ev.actionType)
+
 
 
 def playGame(gameCtrl):
@@ -178,8 +191,8 @@ def playGame(gameCtrl):
         world = World(screen, "rooms.txt", 'backgrounds.txt')
         room = world.rooms[0]
 
-        girlPrincess = Player(Sprite("images/Character Princess Girl.png"), 1, 1)
-        boy = Player(Sprite("images/Character Boy.png"), 1, 3)
+        girlPrincess = Player(1, False, Sprite("images/Character Princess Girl.png"), 1, 1)
+        boy = Player(2, True, Sprite("images/Character Boy.png"), 1, 3)
         world.addPlayer(girlPrincess)
         world.addPlayer(boy)
         player = boy
@@ -198,15 +211,15 @@ def playGame(gameCtrl):
                 et = event.type
                 if et == pygame.QUIT or (et == pygame.KEYDOWN and event.key == pygame.K_q): sys.exit()
                 if et == pygame.KEYDOWN:
-                    if not player.isBusy():
-                        moveAction = player.actionFromKey(event.key)
+                    moveAction = player.actionFromKey(event.key)
 
             # Apply any user actions
             if moveAction != Action.NONE:
                 print('Taking action of ',moveAction)
                 moveAction = gameCtrl.onPlayerMoveRequested(world, player, moveAction)
-                player.takeAction(moveAction)
-                
+
+            world.processQueuedActions(gameCtrl.gameQueue)
+
             # Redraw screen, moving players around as required
             rr = RedrawsRequired()
             world.updatePlayers(rr)
@@ -219,5 +232,6 @@ def playGame(gameCtrl):
         print("Exit")
 
 # Actually run the game
-gameCtrl = GameController()
+gameQueue = queue.Queue()
+gameCtrl = LocalGameController(gameQueue, GameController())
 playGame(gameCtrl)
