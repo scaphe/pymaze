@@ -1,4 +1,7 @@
 
+from PmzGraphics import Pos
+
+
 # Action states
 class Action:
     INIT = -1
@@ -13,6 +16,21 @@ class Action:
         self.actionType = actionType
 
     def __str__(self): return "Action(playerId="+str(self.playerId)+", actionType="+str(self.actionType)+")"
+
+    def asDeltaPos(actionType):    
+        if actionType == Action.MOVE_RIGHT: return Pos(1, 0)
+        elif actionType == Action.MOVE_LEFT: return Pos(-1, 0)
+        elif actionType == Action.MOVE_UP: return Pos(0, -1)
+        elif actionType == Action.MOVE_DOWN: return Pos(0, 1)
+        else: return Pos(0, 0)
+
+    def isMove(actionType):
+        if (actionType == Action.MOVE_RIGHT or actionType == Action.MOVE_LEFT or 
+            actionType == Action.MOVE_UP or actionType == Action.MOVE_DOWN):
+            return True
+        else:
+            return False
+
 
 # WorldChangeActions:
 #  MovePlayer(player, direction)

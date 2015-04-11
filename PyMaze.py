@@ -5,120 +5,7 @@ import queue
 
 from PmzGraphics import *
 from GameController import *
-
-
-
-# Immutable (nice callers respecting my underscores) position
-class Pos:
-    def __init__(self, x, y):
-        self._x = x
-        self._y = y
-
-    def __str__(self): return "Pos("+str(self._x)+", "+str(self._y)+")"
-
-    def x(self): return self._x
-    def y(self): return self._y
-
-    # Returns a changed copy
-    def plus(self, other):
-        return Pos(self._x + other._x, self._y + other._y)
-
-    def isEmpty(self): return self._x == 0 and self._y == 0
-
-
-
-class Player():
-    def __init__(self, playerId, isLocal, sprite, xpos, ypos):
-        self.playerId = playerId
-        self.isLocal = isLocal
-        self._animating = 0
-        self.sprite = sprite
-        self._applyingAction = True
-        self._pos = Pos(xpos, ypos)
-        self.xoff = 0
-        self.yoff = 0
-        self.w = sprite.w
-        self.h = sprite.h
-        self._pendingAction = Action.NONE
-        print('Got h of',self.h)
-
-    def isBusy(self):
-        return self._animating != 0
-
-    def takeAction(self, action):
-        print('takeAction called with',action)
-        self._pendingAction = action
-        if not self.isBusy():
-            self._applyPendingAction()
-
-    def _applyPendingAction(self):
-        action = self._pendingAction
-        # TODO: Check if the user is holding down a key
-        #if action == Action.NONE:
-
-        if action == Action.MOVE_RIGHT: self._aniDelta = Pos(1, 0)
-        elif action == Action.MOVE_LEFT: self._aniDelta = Pos(-1, 0)
-        elif action == Action.MOVE_UP: self._aniDelta = Pos(0, -1)
-        elif action == Action.MOVE_DOWN: self._aniDelta = Pos(0, 1)
-        else: self._aniDelta = Pos(0, 0)
-
-        if not self._aniDelta.isEmpty():
-            print('Starting move using ', self._aniDelta,'from action of',action)
-            # We are going to animate from the current position to the new position
-            self._animating = 20
-            self._aniAction = action
-            self._applyingAction = True
-            self._aniPos = self._pos
-            self._pos = self._pos.plus(self._aniDelta)
-            self.xoff = 0
-            self.yoff = 0
-            # Consumed this action now
-            self._pendingAction = Action.NONE
-        else:
-            print('No move cos',action,' so using', self._aniDelta)
-
-    def animate(self, rr):
-        if self._aniAction == Action.MOVE_RIGHT:
-            rr.addBg(UndrawTask(self.makeX(self._aniPos), self.makeY(self._aniPos), 50, self.h))
-            self.xoff += 5
-        elif self._aniAction == Action.MOVE_LEFT:
-            rr.addBg(UndrawTask(self.makeX(self._aniPos)+self.w-50, self.makeY(self._aniPos), 50, self.h))
-            self.xoff -= 5
-        elif self._aniAction == Action.MOVE_UP:
-            rr.addBg(UndrawTask(self.makeX(self._aniPos), self.makeY(self._aniPos)+self.h*0.4, self.w, self.h*0.6))
-            self.yoff -= 4
-        elif self._aniAction == Action.MOVE_DOWN:
-            rr.addBg(UndrawTask(self.makeX(self._aniPos), self.makeY(self._aniPos), self.w, self.h*0.66))
-            self.yoff += 4
-        rr.addFg(DrawTask(self.sprite, self.makeX(self._aniPos), self.makeY(self._aniPos)))
-
-    def update(self, rr):
-        if self._animating > 0:
-            self._animating -= 1
-            self.animate(rr)
-        else:
-            if self._applyingAction:
-                self.xoff = 0
-                self.yoff = 0
-                rr.addFg(DrawTask(self.sprite, self.makeX(self._pos), self.makeY(self._pos)))
-                self._applyingAction = False
-                self._applyPendingAction()
-
-    def makeX(self, pos): return pos.x() * 100  + self.xoff
-                 
-    def makeY(self, pos): return pos.y() * 80   + self.yoff-40
-        
-    def actionFromKey(self, k):
-        if k == self.rightKey(): return Action.MOVE_RIGHT
-        elif k == self.leftKey(): return Action.MOVE_LEFT
-        elif k == self.upKey(): return Action.MOVE_UP
-        elif k == self.downKey(): return Action.MOVE_DOWN
-        else: return Action.NONE
-
-    def leftKey(self): return pygame.K_z
-    def rightKey(self): return pygame.K_x
-    def upKey(self): return pygame.K_k
-    def downKey(self): return pygame.K_m
+from Player import *
 
 
 
@@ -151,6 +38,7 @@ class World:
         self.worldName = w['world']
         self.rooms = [Room(roomDef) for roomDef in w['rooms']]
         self.players = []
+        self._currentRoom = None
 
     def setCurrentRoom(self, room):
         self._currentRoom = room
@@ -161,8 +49,15 @@ class World:
     def addPlayer(self, p):
         self.players.append(p)
 
+    def isFreeSpace(self, room, pos):
+        if room.tiles[pos.x()][pos.y()] == ' ' and not self.isPlayerAt(room, pos): return True
+        else: return False
+
+    def isPlayerAt(self, room, pos):
+        return (len([p for p in self.players if p._pos.equals(pos)]) > 0)
+
     def updatePlayers(self, rr):
-        for p in self.players: p.update(rr)
+        for p in self.players: p.update(self, rr)
 
     def drawRoom(self):
         drawBackground(self.screen, self.backgrounds, self._currentRoom)
@@ -177,7 +72,6 @@ class World:
             ev = gameQueue.get()
             player = next((x for x in self.players if x.playerId == ev.playerId), None)
             player.takeAction(ev.actionType)
-
 
 
 def playGame(gameCtrl):

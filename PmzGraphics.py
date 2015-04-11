@@ -1,6 +1,28 @@
 import sys, pygame, time
 
 
+# Immutable (nice callers respecting my underscores) position
+class Pos:
+    def __init__(self, x, y):
+        self._x = x
+        self._y = y
+
+    def __str__(self): return "Pos("+str(self._x)+", "+str(self._y)+")"
+
+    def x(self): return self._x
+    def y(self): return self._y
+
+    # Returns a changed copy
+    def plus(self, other):
+        return Pos(self._x + other._x, self._y + other._y)
+
+    def equals(self, other):
+        if self._x == other._x and self._y == other._y: return True
+        else: return False
+
+    def isEmpty(self): return self._x == 0 and self._y == 0
+
+
 class Sprite():
     def __init__(self, filename, xpos=2, ypos=2, xoff=0, yoff=0):
         self.filename = filename
