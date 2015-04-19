@@ -1,4 +1,4 @@
-import sys, pygame, time
+import sys, pygame, time, os
 
 
 # Immutable (nice callers respecting my underscores) position
@@ -25,6 +25,7 @@ class Pos:
 
 class Sprite():
     def __init__(self, filename, xpos=2, ypos=2, xoff=0, yoff=0):
+        self.name = os.path.basename(filename)
         self.filename = filename
         self.img = pygame.image.load(filename).convert_alpha()
         self.rect = self.img.get_rect()
@@ -54,6 +55,9 @@ class Backgrounds:
                 self.map[tileId] = Sprite(line[2:])
                 #print("Set tileId '"+str(tileId)+"' is",self.map[tileId].filename)
 
+    def getSprite(self, id):
+        return self.map[id]
+
 
 # Keep track of wanting to draw a sprite at a place on the screen
 class DrawTask:
@@ -64,6 +68,18 @@ class DrawTask:
 
     def apply(self, screen):
         screen.blit(self.sprite.img, self.sprite.rect.move(self.x, self.y))
+
+
+class DrawTextTask:
+    def __init__(self, text, x, y):
+        self.text = text
+        self.x = x
+        self.y = y
+
+    def apply(self, screen):
+        f = pygame.font.SysFont("monospace", 32)
+        img = f.render(self.text, 0, (255, 0, 0))
+        screen.blit(img, pygame.Rect(self.x,self.y,100,100))
 
 
 # Keep track of wanting to undraw a rectangle on the screen
@@ -105,9 +121,9 @@ class RedrawsRequired:
 
 
 def drawBackground(screen, backgrounds, room):
-    black = 0, 0, 0
+    black = 90, 90, 90
     screen.fill(black)
-    for x in range(0, 9):
+    for x in range(0, 11):
         for y in range(0, 8):
             tile = room.tiles[x][y]
             if tile != ' ':

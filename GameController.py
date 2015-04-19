@@ -60,6 +60,7 @@ class GameController:
     def onPlayerJoin(self, world, player): pass
     
 
+# Immediately do stuff
 class LocalGameController(GameController):
     def __init__(self, gameQueue, wrapped):
         self.gameQueue = gameQueue

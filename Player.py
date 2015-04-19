@@ -13,13 +13,17 @@ class KeySet:
 
 class Constants:
     keySets = [
-        KeySet(pygame.K_z, pygame.K_x, pygame.K_k, pygame.K_m)
+        # Left, right, up, down
+        KeySet(pygame.K_z, pygame.K_x, pygame.K_f, pygame.K_c),
+        KeySet(pygame.K_1, pygame.K_q, pygame.K_e, pygame.K_w),
+        KeySet(pygame.K_b, pygame.K_n, pygame.K_i, pygame.K_j),
+        KeySet(pygame.K_l, pygame.K_p, pygame.K_9, pygame.K_o)
     ]
 
 
 class Player():
     def __init__(self, playerId, isLocal, sprite, xpos, ypos):
-        self.keySet = Constants.keySets[0]
+        self.keySet = Constants.keySets[playerId]
         self.playerId = playerId
         self.isLocal = isLocal
         self._animating = 0
@@ -32,6 +36,9 @@ class Player():
         self._pendingAction = Action.NONE
         self._wantRedraw = True
         print('Got h of',self.h)
+
+    def __str__(self):
+        return "Player("+str(self.playerId)+", local="+str(self.isLocal)+", sprite='"+self.sprite.name+"', pos="+str(self._pos)+")"
 
     def isBusy(self):
         return self._animating != 0

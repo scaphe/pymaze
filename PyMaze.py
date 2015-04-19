@@ -13,7 +13,7 @@ class Room:
     def __init__(self, roomDef):
         self.id = roomDef['roomId']
         self.name = roomDef['name']
-        w = 9
+        w = 11
         h = 8
         self.tiles = [[0 for x in range(h)] for x in range(w)] 
         lines = roomDef['rows']
@@ -27,10 +27,9 @@ class Room:
 
 # State of the World, this keeps track of everything
 class World:
-    def __init__(self, screen, worldDefFile, backgroundsFile):
+    def __init__(self, screen, worldDefFile, backgrounds):
         self.screen = screen
-        self.backgrounds = Backgrounds(backgroundsFile)
-
+        self.backgrounds = backgrounds
         with open(worldDefFile) as f:
             self.worldDef = json.load(f)
             pprint.pprint(self.worldDef)
@@ -48,6 +47,7 @@ class World:
 
     def addPlayer(self, p):
         self.players.append(p)
+        return p
 
     def isFreeSpace(self, room, pos):
         if room.tiles[pos.x()][pos.y()] == ' ' and not self.isPlayerAt(room, pos): return True
@@ -67,6 +67,14 @@ class World:
         rr.apply(self.screen, self.bgScreen)
         pygame.display.flip()
 
+    def playersReactToKey(self, gameCtrl, key):
+        for player in self.players:
+            moveAction = player.actionFromKey(key)
+            # Apply any user actions
+            if moveAction != Action.NONE:
+                print('Player',player,'taking action of',moveAction)
+                gameCtrl.onPlayerMoveRequested(self, player, moveAction)
+
     def processQueuedActions(self, gameQueue):
         while not gameQueue.empty():
             ev = gameQueue.get()
@@ -77,18 +85,18 @@ class World:
 def playGame(gameCtrl):
     try:
         gameTime = 0
-        size = width, height = 1024, 800
+        size = 1224, 800
 
         pygame.init()
         screen = pygame.display.set_mode(size)
-
-        world = World(screen, "rooms.txt", 'backgrounds.txt')
+        backgrounds = Backgrounds('backgrounds.txt')
+        world = World(screen, "rooms.txt", backgrounds)
         room = world.rooms[0]
 
-        girlPrincess = Player(1, False, Sprite("images/Character Princess Girl.png"), 1, 1)
-        boy = Player(2, True, Sprite("images/Character Boy.png"), 1, 3)
-        world.addPlayer(girlPrincess)
-        world.addPlayer(boy)
+        boy = world.addPlayer(Player(0, True, backgrounds.getSprite('0'), 1, 1))
+        world.addPlayer(Player(1, True, backgrounds.getSprite('1'), 1, 3))
+        world.addPlayer(Player(2, True, backgrounds.getSprite('2'), 4, 3))
+        world.addPlayer(Player(3, True, backgrounds.getSprite('3'), 5, 3))
         player = boy
 
         gameCtrl.onInitWorld(world)
@@ -103,20 +111,17 @@ def playGame(gameCtrl):
             moveAction = Action.NONE
             for event in pygame.event.get():
                 et = event.type
-                if et == pygame.QUIT or (et == pygame.KEYDOWN and event.key == pygame.K_q): sys.exit()
+                if et == pygame.QUIT or (et == pygame.KEYDOWN and event.key == pygame.K_ESCAPE): sys.exit()
                 if et == pygame.KEYDOWN:
-                    moveAction = player.actionFromKey(event.key)
-
-            # Apply any user actions
-            if moveAction != Action.NONE:
-                print('Taking action of ',moveAction)
-                moveAction = gameCtrl.onPlayerMoveRequested(world, player, moveAction)
+                    world.playersReactToKey(gameCtrl, event.key)
 
             world.processQueuedActions(gameCtrl.gameQueue)
 
             # Redraw screen, moving players around as required
             rr = RedrawsRequired()
             world.updatePlayers(rr)
+            rr.addFg(DrawTextTask("hi dave", 16,16))
+
             world.drawUpdates(rr)
 
             time.sleep(0.01)
@@ -127,5 +132,6 @@ def playGame(gameCtrl):
 
 # Actually run the game
 gameQueue = queue.Queue()
-gameCtrl = LocalGameController(gameQueue, GameController())
+gameController = GameController()
+gameCtrl = LocalGameController(gameQueue, gameController)
 playGame(gameCtrl)

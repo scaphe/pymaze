@@ -1,6 +1,9 @@
 Todo
-o  Need local controller to re-check pending-action before actually posting it to player on queue - recheck key press
-   Maybe each client needs to accept pending-action back, then just as it would apply, if player is the local player, then recheck?
 o  Draw floor, then walls, then users to add items during init phase?
 o  Ensure that player is not about to move into a square that has something in it
-o  Add another 3 players - with different keys to control them
+o  Need local controller to re-check pending-action before actually posting it to player on queue - recheck key press
+   Maybe each client needs to accept pending-action back, then just as it would apply, if player is the local player, then recheck?
+
+
+Done
+ox Local 4 players, all different keys on same keyboard
