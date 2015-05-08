@@ -1,9 +1,11 @@
 Todo
+o  Abstract the screen, so can move it down or resize it (so could have 4 of them split screen?)
 o  Draw floor, then walls, then users to add items during init phase?
-o  Ensure that player is not about to move into a square that has something in it
+o  Text drawn at top of screen
 o  Need local controller to re-check pending-action before actually posting it to player on queue - recheck key press
    Maybe each client needs to accept pending-action back, then just as it would apply, if player is the local player, then recheck?
-
+o  Networking or 4x screens at once
 
 Done
+ox Ensure that player is not about to move into a square that has something in it
 ox Local 4 players, all different keys on same keyboard

@@ -77,9 +77,13 @@ class DrawTextTask:
         self.y = y
 
     def apply(self, screen):
-        f = pygame.font.SysFont("monospace", 32)
-        img = f.render(self.text, 0, (255, 0, 0))
-        screen.blit(img, pygame.Rect(self.x,self.y,100,100))
+        f = pygame.font.SysFont("monospace", 20)
+        currY = self.y
+        for line in self.text.split("\n"):
+            img = f.render(line, 0, (255, 0, 0))
+            r = img.get_rect()
+            screen.blit(img, pygame.Rect(self.x, currY, r.width, r.height))
+            currY += r.height
 
 
 # Keep track of wanting to undraw a rectangle on the screen
@@ -106,6 +110,7 @@ class RedrawsRequired:
     def reset(self):
         self.bgRedraws = []
         self.fgRedraws = []
+        self.redrawPlayers = False
 
     def addFg(self, task):
         self.fgRedraws.append(task)

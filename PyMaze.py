@@ -58,6 +58,8 @@ class World:
 
     def updatePlayers(self, rr):
         for p in self.players: p.update(self, rr)
+        if rr.redrawPlayers:
+            for p in self.players: p.draw(rr)
 
     def drawRoom(self):
         drawBackground(self.screen, self.backgrounds, self._currentRoom)
@@ -120,7 +122,7 @@ def playGame(gameCtrl):
             # Redraw screen, moving players around as required
             rr = RedrawsRequired()
             world.updatePlayers(rr)
-            rr.addFg(DrawTextTask("hi dave", 16,16))
+            rr.addFg(DrawTextTask("hi dave\nwith a newline", 16,4))
 
             world.drawUpdates(rr)
 

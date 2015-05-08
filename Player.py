@@ -29,8 +29,8 @@ class Player():
         self._animating = 0
         self.sprite = sprite
         self._pos = Pos(xpos, ypos)
-        self.xoff = 0
-        self.yoff = 0
+        self._xoff = 0
+        self._yoff = 0
         self.w = sprite.w
         self.h = sprite.h
         self._pendingAction = Action.NONE
@@ -47,16 +47,29 @@ class Player():
         print('takeAction called with',action)
         self._pendingAction = action
 
+    def draw(self, rr):
+        if self._animating > 0:
+            rr.addBg(UndrawTask(self._makeX(self._aniPos), self._makeY(self._aniPos), self.w, self.h))
+            rr.addFg(DrawTask(self.sprite, self._makeX(self._aniPos), self._makeY(self._aniPos)))
+        else:
+            #print('Drawing',self.playerId,'at',self._pos,'with offsets',self._xoff,',',self._yoff)
+            rr.addBg(UndrawTask(self._makeX(self._pos), self._makeY(self._pos), self.w, self.h))
+            rr.addFg(DrawTask(self.sprite, self._makeX(self._pos), self._makeY(self._pos)))
+
+
     def update(self, world, rr):
         if self._animating > 0:
             self._animating -= 1
             self._animate(rr)
+            if self._animating == 0:
+                self._xoff = 0
+                self._yoff = 0
         else:
             if self._wantRedraw:
-                self.xoff = 0
-                self.yoff = 0
-                rr.addFg(DrawTask(self.sprite, self._makeX(self._pos), self._makeY(self._pos)))
                 self._wantRedraw = False
+                rr.redrawPlayers = True
+                #print('Drawing',self.playerId,'at',self._pos,'with offsets',self._xoff,',',self._yoff)
+                #rr.addFg(DrawTask(self.sprite, self._makeX(self._pos), self._makeY(self._pos)))
             if self._pendingAction != Action.NONE:
                 aniDelta = Action.asDeltaPos(self._pendingAction)
                 # Check if we are moving into a space - TODO: Room
@@ -64,41 +77,44 @@ class Player():
                     self._applyPendingAction()
                 self._pendingAction = Action.NONE
 
+    def _animate(self, rr):
+        if self._aniAction == Action.MOVE_RIGHT:
+            rr.addBg(UndrawTask(self._makeX(self._aniPos), self._makeY(self._aniPos), 50, self.h))
+            self._xoff += 5
+        elif self._aniAction == Action.MOVE_LEFT:
+            rr.addBg(UndrawTask(self._makeX(self._aniPos)+self.w-50, self._makeY(self._aniPos), 50, self.h))
+            self._xoff -= 5
+        elif self._aniAction == Action.MOVE_UP:
+            rr.addBg(UndrawTask(self._makeX(self._aniPos), self._makeY(self._aniPos)+self.h*0.4, self.w, self.h*0.6))
+            self._yoff -= 4
+        elif self._aniAction == Action.MOVE_DOWN:
+            rr.addBg(UndrawTask(self._makeX(self._aniPos), self._makeY(self._aniPos), self.w, self.h*0.66))
+            self._yoff += 4
+        rr.redrawPlayers = True
+        #rr.addFg(DrawTask(self.sprite, self._makeX(self._aniPos), self._makeY(self._aniPos)))
+
     def _applyPendingAction(self):
         action = self._pendingAction
         self._aniDelta = Action.asDeltaPos(action)
 
         if not self._aniDelta.isEmpty():
-            print('Starting move using ', self._aniDelta,'from action of',action)
+            print('Starting move from pos',self._pos,'using aniDelta',self._aniDelta,'from action of',action)
             # We are going to animate from the current position to the new position
             self._animating = 20
             self._aniAction = action
             self._aniPos = self._pos
+            print("Changing pos from", self._pos)
             self._pos = self._pos.plus(self._aniDelta)
-            self.xoff = 0
-            self.yoff = 0
+            print("Changed pos to",self._pos)
+            self._xoff = 0
+            self._yoff = 0
             # Consumed this action now
         else:
             print('No move cos',action,' so using', self._aniDelta)
 
-    def _animate(self, rr):
-        if self._aniAction == Action.MOVE_RIGHT:
-            rr.addBg(UndrawTask(self._makeX(self._aniPos), self._makeY(self._aniPos), 50, self.h))
-            self.xoff += 5
-        elif self._aniAction == Action.MOVE_LEFT:
-            rr.addBg(UndrawTask(self._makeX(self._aniPos)+self.w-50, self._makeY(self._aniPos), 50, self.h))
-            self.xoff -= 5
-        elif self._aniAction == Action.MOVE_UP:
-            rr.addBg(UndrawTask(self._makeX(self._aniPos), self._makeY(self._aniPos)+self.h*0.4, self.w, self.h*0.6))
-            self.yoff -= 4
-        elif self._aniAction == Action.MOVE_DOWN:
-            rr.addBg(UndrawTask(self._makeX(self._aniPos), self._makeY(self._aniPos), self.w, self.h*0.66))
-            self.yoff += 4
-        rr.addFg(DrawTask(self.sprite, self._makeX(self._aniPos), self._makeY(self._aniPos)))
-
-    def _makeX(self, pos): return pos.x() * 100  + self.xoff
+    def _makeX(self, pos): return pos.x() * 100  + self._xoff
                  
-    def _makeY(self, pos): return pos.y() * 80   + self.yoff-40
+    def _makeY(self, pos): return pos.y() * 80   + self._yoff-40
         
     def actionFromKey(self, k):
         if k == self.keySet.right: return Action.MOVE_RIGHT
