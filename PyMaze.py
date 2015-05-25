@@ -91,8 +91,8 @@ def playGame(gameCtrl):
 
         pygame.init()
         screen = pygame.display.set_mode(size)
-        backgrounds = Backgrounds('backgrounds.txt')
-        world = World(screen, "rooms.txt", backgrounds)
+        backgrounds = Backgrounds('resources/backgrounds.txt')
+        world = World(screen, "resources/rooms.txt", backgrounds)
         room = world.rooms[0]
 
         boy = world.addPlayer(Player(0, True, backgrounds.getSprite('0'), 1, 1))
