@@ -6,9 +6,11 @@ import queue
 from PmzGraphics import *
 from GameController import *
 from Player import *
+from GameHost import *
 
 
-
+# Contains definition of room
+# self.tiles - 2x2 array of sprite ids
 class Room:
     def __init__(self, roomDef):
         self.id = roomDef['roomId']
@@ -26,10 +28,9 @@ class Room:
 
 
 # State of the World, this keeps track of everything
-class World:
-    def __init__(self, screen, worldDefFile, backgrounds):
+class WorldState:
+    def __init__(self, screen, worldDefFile):
         self.screen = screen
-        self.backgrounds = backgrounds
         with open(worldDefFile) as f:
             self.worldDef = json.load(f)
             pprint.pprint(self.worldDef)
@@ -37,17 +38,21 @@ class World:
         self.worldName = w['world']
         self.rooms = [Room(roomDef) for roomDef in w['rooms']]
         self.players = []
-        self._currentRoom = None
-
-    def setCurrentRoom(self, room):
-        self._currentRoom = room
-        # Init bgScreen so we can undraw stuff
-        self.bgScreen = self.screen.copy()
-        drawBackground(self.bgScreen, self.backgrounds, room)
+        self._localPlayer = None
 
     def addPlayer(self, p):
         self.players.append(p)
         return p
+
+    def setLocalPlayer(self, player):
+        self._localPlayer = player
+        if self.screen is not None:
+            self.screen.setCurrentRoom(self._localPlayer._currentRoom)
+
+    def updatePlayers(self, rr):
+        for p in self.players: p.update(self, rr)
+        if rr.redrawPlayers:
+            for p in self.players: p.draw(rr)
 
     def isFreeSpace(self, room, pos):
         if room.tiles[pos.x()][pos.y()] == ' ' and not self.isPlayerAt(room, pos): return True
@@ -55,19 +60,6 @@ class World:
 
     def isPlayerAt(self, room, pos):
         return (len([p for p in self.players if p._pos.equals(pos)]) > 0)
-
-    def updatePlayers(self, rr):
-        for p in self.players: p.update(self, rr)
-        if rr.redrawPlayers:
-            for p in self.players: p.draw(rr)
-
-    def drawRoom(self):
-        drawBackground(self.screen, self.backgrounds, self._currentRoom)
-        pygame.display.flip()
-
-    def drawUpdates(self, rr):
-        rr.apply(self.screen, self.bgScreen)
-        pygame.display.flip()
 
     def playersReactToKey(self, gameCtrl, key):
         for player in self.players:
@@ -87,24 +79,26 @@ class World:
 def playGame(gameCtrl):
     try:
         gameTime = 0
-        size = 1224, 800
 
         pygame.init()
-        screen = pygame.display.set_mode(size)
+
+        screen = Screen()
         backgrounds = Backgrounds('resources/backgrounds.txt')
-        world = World(screen, "resources/rooms.txt", backgrounds)
+        screen.setBackgrounds(backgrounds)
+        gameHost = GameHost()
+        world = WorldState(screen, "resources/rooms.txt")
         room = world.rooms[0]
 
-        boy = world.addPlayer(Player(0, True, backgrounds.getSprite('0'), 1, 1))
-        world.addPlayer(Player(1, True, backgrounds.getSprite('1'), 1, 3))
-        world.addPlayer(Player(2, True, backgrounds.getSprite('2'), 4, 3))
-        world.addPlayer(Player(3, True, backgrounds.getSprite('3'), 5, 3))
+        boy = world.addPlayer(Player(0, backgrounds.getSprite('0'), room, 1, 1))
+        world.addPlayer(Player(1, backgrounds.getSprite('1'), room, 1, 3))
+        world.addPlayer(Player(2, backgrounds.getSprite('2'), room, 4, 3))
+        world.addPlayer(Player(3, backgrounds.getSprite('3'), room, 5, 3))
         player = boy
 
         gameCtrl.onInitWorld(world)
 
-        world.setCurrentRoom(room)
-        world.drawRoom()
+        world.setLocalPlayer(boy)
+        screen.drawRoom()
 
         while 1:
             gameCtrl.onGameTimePasses(world, gameTime)
@@ -124,7 +118,7 @@ def playGame(gameCtrl):
             world.updatePlayers(rr)
             rr.addFg(DrawTextTask("hi dave\nwith a newline", 16,4))
 
-            world.drawUpdates(rr)
+            screen.drawUpdates(rr)
 
             time.sleep(0.01)
 

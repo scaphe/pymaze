@@ -24,25 +24,29 @@ class Pos:
 
 
 class Sprite():
-    def __init__(self, filename, xpos=2, ypos=2, xoff=0, yoff=0):
+    # xoff and yoff are in percent
+    def __init__(self, filename):
+        self.Width = 100
+        self.Height = 80
+        # Halve size of sprites
+        self.Width = 50
+        self.Height = 40
         self.name = os.path.basename(filename)
         self.filename = filename
         self.img = pygame.image.load(filename).convert_alpha()
-        self.rect = self.img.get_rect()
-        self.xpos = xpos
-        self.ypos = ypos
-        self.xoff = xoff
-        self.yoff = yoff
-        self.w = self.rect.width
-        self.h = self.rect.height
-        self.initxoff = xoff
-        self.inityoff = yoff
+        self.img = pygame.transform.smoothscale(self.img, (int(self.img.get_rect().width/2), int(self.img.get_rect().height/2)))
+        rect = self.img.get_rect()
+        self.width = rect.width
+        self.height = rect.height
 
-    def draw(self, screen):
-        self.drawAt(screen, self.xpos, self.ypos)
+    def drawAt(self, screen, x, y, xoff, yoff):
+        screen.blit(self.img, (self.xOf(x, xoff), self.yOf(y, yoff)))
 
-    def drawAt(self, screen, x, y):
-        screen.blit(self.img, self.rect.move(x*100+self.xoff, y*80+self.yoff))
+    def xOf(self, x, xoff):
+        return int((x+xoff/100) * self.Width)
+
+    def yOf(self, y, yoff):
+        return int((y+yoff/100) * self.Height)
 
 
 class Backgrounds:
@@ -61,14 +65,31 @@ class Backgrounds:
 
 # Keep track of wanting to draw a sprite at a place on the screen
 class DrawTask:
-    def __init__(self, sprite, x, y):
+    def __init__(self, sprite, pos, xoff, yoff):
         self.sprite = sprite
-        self.x = x
-        self.y = y
+        self.pos = pos
+        self.xoff = xoff
+        self.yoff = yoff
 
     def apply(self, screen):
-        screen.blit(self.sprite.img, self.sprite.rect.move(self.x, self.y))
+        self.sprite.drawAt(screen, self.pos.x(), self.pos.y(), self.xoff, self.yoff)
 
+
+# Keep track of wanting to undraw a rectangle on the screen
+class UndrawTask:
+    def __init__(self, sprite, pos):
+        self.sprite = sprite
+        self.pos = pos
+
+    def apply(self, screen, bgScreen):
+        try:
+            x = self.sprite.xOf(self.pos.x(), 0)
+            y = self.sprite.yOf(self.pos.y(), 0)
+            bgImg = bgScreen.subsurface(pygame.Rect(x, y, self.sprite.width, self.sprite.height))
+            screen.blit(bgImg, pygame.Rect(x, y, bgImg.get_rect().width, bgImg.get_rect().height))
+        except ValueError as e:
+            print('Failed with',e,'with',self.x,self.y,self.w,self.h)
+        
 
 class DrawTextTask:
     def __init__(self, text, x, y):
@@ -85,22 +106,6 @@ class DrawTextTask:
             screen.blit(img, pygame.Rect(self.x, currY, r.width, r.height))
             currY += r.height
 
-
-# Keep track of wanting to undraw a rectangle on the screen
-class UndrawTask:
-    def __init__(self, x, y, w, h):
-        self.x = x
-        self.y = y
-        self.w = w
-        self.h = h
-
-    def apply(self, screen, bgScreen):
-        try:
-            bgImg = bgScreen.subsurface(pygame.Rect(self.x, self.y, self.w, self.h))
-            screen.blit(bgImg, pygame.Rect(self.x, self.y, bgImg.get_rect().width, bgImg.get_rect().height))
-        except ValueError as e:
-            print('Failed with',e,'with',self.x,self.y,self.w,self.h)
-        
 
 # Keep track of what redraws we want to do, apply() will actually draw them (in the right order)
 class RedrawsRequired:
@@ -124,14 +129,35 @@ class RedrawsRequired:
         self.reset()
         
 
+class Screen:
+    def __init__(self):
+        size = 1224, 800
+        self.screen = pygame.display.set_mode(size)
 
-def drawBackground(screen, backgrounds, room):
-    black = 90, 90, 90
-    screen.fill(black)
-    for x in range(0, 11):
-        for y in range(0, 8):
-            tile = room.tiles[x][y]
-            if tile != ' ':
-                bg = backgrounds.map[tile]
-                bg.drawAt(screen, x, y)
+    def setBackgrounds(self, backgrounds):
+        self.backgrounds = backgrounds
+
+    def setCurrentRoom(self, room):
+        self._currentRoom = room
+        # Init bgScreen so we can undraw stuff
+        self.bgScreen = self.screen.copy()
+        self.drawBackground(self.bgScreen, room)
+
+    def drawRoom(self):
+        self.drawBackground(self.screen, self._currentRoom)
+        pygame.display.flip()
+
+    def drawUpdates(self, rr):
+        rr.apply(self.screen, self.bgScreen)
+        pygame.display.flip()
+
+    def drawBackground(self, screen, room):
+        black = 90, 90, 90
+        screen.fill(black)
+        for x in range(0, 11):
+            for y in range(0, 8):
+                tile = room.tiles[x][y]
+                if tile != ' ':
+                    bg = self.backgrounds.map[tile]
+                    bg.drawAt(screen, x, y, 0, 0)
 
