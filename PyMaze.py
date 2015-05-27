@@ -82,7 +82,10 @@ def playGame(gameCtrl):
 
         pygame.init()
 
-        screen = Screen()
+        size = 1224, 800
+        pyScreen = pygame.display.set_mode(size)
+
+        screen = Screen(pyScreen)
         backgrounds = Backgrounds('resources/backgrounds.txt')
         screen.setBackgrounds(backgrounds)
         gameHost = GameHost()
@@ -99,6 +102,8 @@ def playGame(gameCtrl):
 
         world.setLocalPlayer(boy)
         screen.drawRoom()
+        pygame.display.flip()
+
 
         while 1:
             gameCtrl.onGameTimePasses(world, gameTime)
@@ -119,6 +124,7 @@ def playGame(gameCtrl):
             rr.addFg(DrawTextTask("hi dave\nwith a newline", 16,4))
 
             screen.drawUpdates(rr)
+            pygame.display.flip()
 
             time.sleep(0.01)
 

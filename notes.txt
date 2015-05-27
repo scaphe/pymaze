@@ -1,5 +1,5 @@
 Todo
-o  Abstract the screen, so can move it down or resize it (so could have 4 of them split screen?)
+o  GameHost, 4x GameClients, 
 o  Draw floor, then walls, then users to add items during init phase?
 o  Text drawn at top of screen
 o  Need local controller to re-check pending-action before actually posting it to player on queue - recheck key press
@@ -7,5 +7,6 @@ o  Need local controller to re-check pending-action before actually posting it t
 o  Networking or 4x screens at once
 
 Done
+ox Abstract the screen, so can change base x,y or resize it (so could have 4 of them split screen?) - TransposedPyScreen
 ox Ensure that player is not about to move into a square that has something in it
 ox Local 4 players, all different keys on same keyboard

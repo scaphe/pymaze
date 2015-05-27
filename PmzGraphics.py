@@ -39,8 +39,8 @@ class Sprite():
         self.width = rect.width
         self.height = rect.height
 
-    def drawAt(self, screen, x, y, xoff, yoff):
-        screen.blit(self.img, (self.xOf(x, xoff), self.yOf(y, yoff)))
+    def drawAt(self, pyScreen, x, y, xoff, yoff):
+        pyScreen.blit(self.img, (self.xOf(x, xoff), self.yOf(y, yoff)))
 
     def xOf(self, x, xoff):
         return int((x+xoff/100) * self.Width)
@@ -130,9 +130,8 @@ class RedrawsRequired:
         
 
 class Screen:
-    def __init__(self):
-        size = 1224, 800
-        self.screen = pygame.display.set_mode(size)
+    def __init__(self, pyScreen):
+        self.pyScreen = TransposedPyScreen(pyScreen)
 
     def setBackgrounds(self, backgrounds):
         self.backgrounds = backgrounds
@@ -140,24 +139,54 @@ class Screen:
     def setCurrentRoom(self, room):
         self._currentRoom = room
         # Init bgScreen so we can undraw stuff
-        self.bgScreen = self.screen.copy()
-        self.drawBackground(self.bgScreen, room)
+        self.bgPyScreen = self.pyScreen.copy()
+        self.drawBackground(self.bgPyScreen, room)
 
     def drawRoom(self):
-        self.drawBackground(self.screen, self._currentRoom)
-        pygame.display.flip()
+        self.drawBackground(self.pyScreen, self._currentRoom)
 
     def drawUpdates(self, rr):
-        rr.apply(self.screen, self.bgScreen)
-        pygame.display.flip()
+        rr.apply(self.pyScreen, self.bgPyScreen)
 
-    def drawBackground(self, screen, room):
+    def drawBackground(self, pyScreen, room):
         black = 90, 90, 90
-        screen.fill(black)
+        pyScreen.fill(black)
         for x in range(0, 11):
             for y in range(0, 8):
                 tile = room.tiles[x][y]
                 if tile != ' ':
                     bg = self.backgrounds.map[tile]
-                    bg.drawAt(screen, x, y, 0, 0)
+                    bg.drawAt(pyScreen, x, y, 0, 0)
 
+class TransposedPyScreen:
+    def __init__(self, pyScreen):
+        self.pyScreen = pyScreen
+
+    def shiftX(self, x): return x+50
+
+    def shiftY(self, y): return y+15
+
+    def blit(self, img, xy):
+        x = xy[0]
+        y = xy[1]
+        x = self.shiftX(x)
+        y = self.shiftY(y)
+        try:
+            w = xy[2]
+            h = xy[3]       
+            self.pyScreen.blit(img, pygame.Rect(x, y, w, h))
+        except:
+            self.pyScreen.blit(img, (x, y))
+
+
+    def subsurface(self, r):
+        x = self.shiftX(r.x)
+        y = self.shiftY(r.y)
+        r2 = pygame.Rect(x, y, r.w, r.h)
+        return self.pyScreen.subsurface(r2)
+
+    def fill(self, colour):
+        self.pyScreen.fill(colour)
+
+    def copy(self):
+        return TransposedPyScreen(self.pyScreen.copy())
