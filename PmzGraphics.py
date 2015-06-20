@@ -25,38 +25,43 @@ class Pos:
 
 class Sprite():
     # xoff and yoff are in percent
-    def __init__(self, filename):
-        self.Width = 100
-        self.Height = 80
-        # Halve size of sprites
-        self.Width = 50
-        self.Height = 40
+    def __init__(self, filename, screen):
         self.name = os.path.basename(filename)
         self.filename = filename
         self.img = pygame.image.load(filename).convert_alpha()
-        self.img = pygame.transform.smoothscale(self.img, (int(self.img.get_rect().width/2), int(self.img.get_rect().height/2)))
         rect = self.img.get_rect()
         self.width = rect.width
         self.height = rect.height
+        # Sprites are too tall, cos they have the top transparent bit at the moment, so fix the height
+        self.width = 100
+        self.height = 80
+        # Scale what we are going to draw on the screen, screen will scale all coords we draw at
+        self.img = pygame.transform.smoothscale(self.img, (
+            int(self.img.get_rect().width * screen.scaleX), 
+            int(self.img.get_rect().height * screen.scaleY)))
+        print('Got sprite w/h of ',self.width,'/',self.height)
 
     def drawAt(self, pyScreen, x, y, xoff, yoff):
         pyScreen.blit(self.img, (self.xOf(x, xoff), self.yOf(y, yoff)))
 
     def xOf(self, x, xoff):
-        return int((x+xoff/100) * self.Width)
+        return int((x+xoff/100) * self.width)
 
     def yOf(self, y, yoff):
-        return int((y+yoff/100) * self.Height)
+        return int((y+yoff/100) * self.height)
 
 
-class Backgrounds:
-    def __init__(self, backgroundMapFile):
+class SpriteStore:
+    def __init__(self, spritesMapFile, screen):
         self.map = {}
-        for aline in open(backgroundMapFile):
+        for aline in open(spritesMapFile):
             line = aline.rstrip()
             if line != '':
                 tileId = line[0]
-                self.map[tileId] = Sprite(line[2:])
+                sprite = Sprite(line[2:], screen)
+                self.map[tileId] = sprite
+                self.width = sprite.width
+                self.height = sprite.height
                 #print("Set tileId '"+str(tileId)+"' is",self.map[tileId].filename)
 
     def getSprite(self, id):
@@ -65,30 +70,32 @@ class Backgrounds:
 
 # Keep track of wanting to draw a sprite at a place on the screen
 class DrawTask:
-    def __init__(self, sprite, pos, xoff, yoff):
-        self.sprite = sprite
+    def __init__(self, spriteId, pos, xoff, yoff):
+        self.spriteId = spriteId
         self.pos = pos
         self.xoff = xoff
         self.yoff = yoff
 
     def apply(self, screen):
-        self.sprite.drawAt(screen, self.pos.x(), self.pos.y(), self.xoff, self.yoff)
+        sprite = screen.findSprite(self.spriteId)
+        sprite.drawAt(screen.pyScreen, self.pos.x(), self.pos.y(), self.xoff, self.yoff)
 
 
 # Keep track of wanting to undraw a rectangle on the screen
 class UndrawTask:
-    def __init__(self, sprite, pos):
-        self.sprite = sprite
+    def __init__(self, spriteId, pos):
+        self.spriteId = spriteId
         self.pos = pos
 
     def apply(self, screen, bgScreen):
         try:
-            x = self.sprite.xOf(self.pos.x(), 0)
-            y = self.sprite.yOf(self.pos.y(), 0)
-            bgImg = bgScreen.subsurface(pygame.Rect(x, y, self.sprite.width, self.sprite.height))
-            screen.blit(bgImg, pygame.Rect(x, y, bgImg.get_rect().width, bgImg.get_rect().height))
+            sprite = screen.findSprite(self.spriteId)
+            x = sprite.xOf(self.pos.x(), 0)
+            y = sprite.yOf(self.pos.y(), 0)
+            bgImg = bgScreen.subsurface(pygame.Rect(x, y, sprite.width, sprite.height))
+            screen.pyScreen.blit(bgImg, pygame.Rect(x, y, bgImg.get_rect().width, bgImg.get_rect().height))
         except ValueError as e:
-            print('Failed with',e,'with',self.x,self.y,self.w,self.h)
+            print('Failed with',e,'with',self.spriteId,self.pos.x(),self.pos.y())
         
 
 class DrawTextTask:
@@ -103,7 +110,7 @@ class DrawTextTask:
         for line in self.text.split("\n"):
             img = f.render(line, 0, (255, 0, 0))
             r = img.get_rect()
-            screen.blit(img, pygame.Rect(self.x, currY, r.width, r.height))
+            screen.pyScreen.blit(img, pygame.Rect(self.x, currY, r.width, r.height))
             currY += r.height
 
 
@@ -130,11 +137,17 @@ class RedrawsRequired:
         
 
 class Screen:
-    def __init__(self, pyScreen):
-        self.pyScreen = TransposedPyScreen(pyScreen)
+    def __init__(self, pyScreen, black):
+        self.pyScreen = pyScreen
+        self.black = black
 
-    def setBackgrounds(self, backgrounds):
-        self.backgrounds = backgrounds
+    def loadSprites(self, spritesMapFile):
+        self.spriteStore = SpriteStore(spritesMapFile, self.pyScreen)
+        self.pyScreen.setSize(11*self.spriteStore.width, 8*self.spriteStore.height)
+        return self.spriteStore
+
+    def findSprite(self, spriteId):
+        return self.spriteStore.map[spriteId]
 
     def setCurrentRoom(self, room):
         self._currentRoom = room
@@ -146,25 +159,35 @@ class Screen:
         self.drawBackground(self.pyScreen, self._currentRoom)
 
     def drawUpdates(self, rr):
-        rr.apply(self.pyScreen, self.bgPyScreen)
+        rr.apply(self, self.bgPyScreen)
 
     def drawBackground(self, pyScreen, room):
-        black = 90, 90, 90
-        pyScreen.fill(black)
+        pyScreen.fill(self.black)
         for x in range(0, 11):
             for y in range(0, 8):
                 tile = room.tiles[x][y]
                 if tile != ' ':
-                    bg = self.backgrounds.map[tile]
+                    bg = self.spriteStore.map[tile]
                     bg.drawAt(pyScreen, x, y, 0, 0)
 
+
 class TransposedPyScreen:
-    def __init__(self, pyScreen):
+    def __init__(self, pyScreen, offsetX, offsetY, scaleX, scaleY, maxX=100, maxY=150):
         self.pyScreen = pyScreen
+        self.offsetX = offsetX
+        self.offsetY = offsetY
+        self.scaleX = scaleX
+        self.scaleY = scaleY
+        self.maxX = maxX
+        self.maxY = maxY
 
-    def shiftX(self, x): return x+50
+    def setSize(self, szX, szY):
+        self.maxX = self.offsetX + (szX * self.scaleX)
+        self.maxY = self.offsetY + (szY * self.scaleY)
 
-    def shiftY(self, y): return y+15
+    def shiftX(self, x): return (x * self.scaleX) + self.offsetX
+
+    def shiftY(self, y): return (y * self.scaleY) + self.offsetY
 
     def blit(self, img, xy):
         x = xy[0]
@@ -172,21 +195,20 @@ class TransposedPyScreen:
         x = self.shiftX(x)
         y = self.shiftY(y)
         try:
-            w = xy[2]
-            h = xy[3]       
+            w = xy[2] * self.scaleX
+            h = xy[3] * self.scaleY
             self.pyScreen.blit(img, pygame.Rect(x, y, w, h))
         except:
             self.pyScreen.blit(img, (x, y))
 
-
     def subsurface(self, r):
         x = self.shiftX(r.x)
         y = self.shiftY(r.y)
-        r2 = pygame.Rect(x, y, r.w, r.h)
-        return self.pyScreen.subsurface(r2)
+        ss = pygame.Rect(x, y, r.w, r.h)
+        return self.pyScreen.subsurface(ss)
 
     def fill(self, colour):
-        self.pyScreen.fill(colour)
+        self.pyScreen.fill(colour, pygame.Rect(self.offsetX, self.offsetY, self.maxX, self.maxY))
 
     def copy(self):
-        return TransposedPyScreen(self.pyScreen.copy())
+        return TransposedPyScreen(self.pyScreen.copy(), self.offsetX, self.offsetY, self.scaleX, self.scaleY, self.maxX, self.maxY)

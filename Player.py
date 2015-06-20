@@ -5,11 +5,11 @@ from KeySet import *
 
 
 class Player():
-    def __init__(self, playerId, sprite, room, xpos, ypos):
+    def __init__(self, playerId, spriteId, room, xpos, ypos):
         self.keySet = Constants.keySets[playerId]
         self.playerId = playerId
         self._currentRoom = room
-        self.sprite = sprite
+        self.spriteId = spriteId
         self._pos = Pos(xpos, ypos)
         # How many steps of animation are remaining
         self.NumberOfAnimationSteps = 20
@@ -19,14 +19,12 @@ class Player():
         # _xoff/_yoff is how far along the animation we are, in percent
         self._xoff = 0
         self._yoff = 0
-        #self.w = sprite.w
-        #   self.h = sprite.h
         self._pendingAction = Action.NONE
         self._wantRedraw = True
         #print('Got h of',self.h)
 
     def __str__(self):
-        return "Player("+str(self.playerId)+", sprite='"+self.sprite.name+"', pos="+str(self._pos)+")"
+        return "Player("+str(self.playerId)+", spriteId='"+self.spriteId+"', pos="+str(self._pos)+")"
 
     def isBusy(self):
         return self._animating != 0
@@ -37,13 +35,13 @@ class Player():
 
     def draw(self, rr):
         if self._animating > 0:
-            rr.addBg(UndrawTask(self.sprite, self._aniPos))
-            rr.addBg(UndrawTask(self.sprite, self._pos))
-            rr.addFg(DrawTask(self.sprite, self._aniPos, self._xoff, self._yoff))
+            rr.addBg(UndrawTask(self.spriteId, self._aniPos))
+            rr.addBg(UndrawTask(self.spriteId, self._pos))
+            rr.addFg(DrawTask(self.spriteId, self._aniPos, self._xoff, self._yoff))
         else:
             #print('Drawing',self.playerId,'at',self._pos,'with offsets',self._xoff,',',self._yoff)
-            rr.addBg(UndrawTask(self.sprite, self._pos))
-            rr.addFg(DrawTask(self.sprite, self._pos, 0, 0))
+            rr.addBg(UndrawTask(self.spriteId, self._pos))
+            rr.addFg(DrawTask(self.spriteId, self._pos, 0, 0))
 
     def _animate(self, rr):
         undrawRequired = False
@@ -61,10 +59,10 @@ class Player():
             undrawRequired = True
             self._yoff += aniStep
         if undrawRequired:
-            rr.addBg(UndrawTask(self.sprite, self._aniPos))
-            rr.addBg(UndrawTask(self.sprite, self._pos))
+            rr.addBg(UndrawTask(self.spriteId, self._aniPos))
+            rr.addBg(UndrawTask(self.spriteId, self._pos))
         rr.redrawPlayers = True
-        #rr.addFg(DrawTask(self.sprite, self._makeX(self._aniPos), self._makeY(self._aniPos)))
+        #rr.addFg(DrawTask(self.spriteId, self._makeX(self._aniPos), self._makeY(self._aniPos)))
 
     def update(self, world, rr):
         if self._animating > 0:
@@ -78,7 +76,7 @@ class Player():
                 self._wantRedraw = False
                 rr.redrawPlayers = True
                 #print('Drawing',self.playerId,'at',self._pos,'with offsets',self._xoff,',',self._yoff)
-                #rr.addFg(DrawTask(self.sprite, self._makeX(self._pos), self._makeY(self._pos)))
+                #rr.addFg(DrawTask(self.spriteId, self._makeX(self._pos), self._makeY(self._pos)))
             if self._pendingAction != Action.NONE:
                 aniDelta = Action.asDeltaPos(self._pendingAction)
                 # Check if we are moving into a space - TODO: Room

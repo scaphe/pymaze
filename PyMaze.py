@@ -29,8 +29,7 @@ class Room:
 
 # State of the World, this keeps track of everything
 class WorldState:
-    def __init__(self, screen, worldDefFile):
-        self.screen = screen
+    def __init__(self, worldDefFile):
         with open(worldDefFile) as f:
             self.worldDef = json.load(f)
             pprint.pprint(self.worldDef)
@@ -38,16 +37,10 @@ class WorldState:
         self.worldName = w['world']
         self.rooms = [Room(roomDef) for roomDef in w['rooms']]
         self.players = []
-        self._localPlayer = None
 
     def addPlayer(self, p):
         self.players.append(p)
         return p
-
-    def setLocalPlayer(self, player):
-        self._localPlayer = player
-        if self.screen is not None:
-            self.screen.setCurrentRoom(self._localPlayer._currentRoom)
 
     def updatePlayers(self, rr):
         for p in self.players: p.update(self, rr)
@@ -76,64 +69,86 @@ class WorldState:
             player.takeAction(ev.actionType)
 
 
-def playGame(gameCtrl):
-    try:
-        gameTime = 0
+class GameRunner:
+    def run(self, screen, world, player):
+        self.screen = screen
+        self.screen.loadSprites('resources/backgrounds.txt')
+        self.gameHost = GameHost()
+        self.world = world
 
-        pygame.init()
+        self.screen.setCurrentRoom(player._currentRoom)
+        self.screen.drawRoom()
 
-        size = 1224, 800
-        pyScreen = pygame.display.set_mode(size)
+    def runLoop(self):
+        # Redraw screen, moving players around as required
+        rr = RedrawsRequired()
+        self.world.updatePlayers(rr)
+        rr.addFg(DrawTextTask("hi dave\nwith a newline", 16,4))
 
-        screen = Screen(pyScreen)
-        backgrounds = Backgrounds('resources/backgrounds.txt')
-        screen.setBackgrounds(backgrounds)
-        gameHost = GameHost()
-        world = WorldState(screen, "resources/rooms.txt")
-        room = world.rooms[0]
-
-        boy = world.addPlayer(Player(0, backgrounds.getSprite('0'), room, 1, 1))
-        world.addPlayer(Player(1, backgrounds.getSprite('1'), room, 1, 3))
-        world.addPlayer(Player(2, backgrounds.getSprite('2'), room, 4, 3))
-        world.addPlayer(Player(3, backgrounds.getSprite('3'), room, 5, 3))
-        player = boy
-
-        gameCtrl.onInitWorld(world)
-
-        world.setLocalPlayer(boy)
-        screen.drawRoom()
-        pygame.display.flip()
+        self.screen.drawUpdates(rr)
 
 
-        while 1:
-            gameCtrl.onGameTimePasses(world, gameTime)
+class Main:
+    def playGame(self, gameCtrl):
+        try:
+            pygame.init()
 
-            # Drain event queue and check for user actions
-            moveAction = Action.NONE
-            for event in pygame.event.get():
-                et = event.type
-                if et == pygame.QUIT or (et == pygame.KEYDOWN and event.key == pygame.K_ESCAPE): sys.exit()
-                if et == pygame.KEYDOWN:
-                    world.playersReactToKey(gameCtrl, event.key)
+            size = 1224, 800
+            pyScreen = pygame.display.set_mode(size)
 
-            world.processQueuedActions(gameCtrl.gameQueue)
+            # Setup world state
+            world = WorldState("resources/rooms.txt")
+            room = world.rooms[0]
+            player1 = world.addPlayer(Player(0, '0', room, 1, 1))
+            player2 = world.addPlayer(Player(1, '1', room, 1, 3))
+            world.addPlayer(Player(2, '2', room, 4, 3))
+            world.addPlayer(Player(3, '3', room, 5, 3))
 
-            # Redraw screen, moving players around as required
-            rr = RedrawsRequired()
-            world.updatePlayers(rr)
-            rr.addFg(DrawTextTask("hi dave\nwith a newline", 16,4))
+            # Setup two screens/games
+            black = 90, 90, 90
+            screen1 = Screen(TransposedPyScreen(pyScreen, 4, 50, 0.5, 0.5), black)
+            game1 = GameRunner()
+            game1.run(screen1, world, player1)
 
-            screen.drawUpdates(rr)
+            black2 = 128,0,0
+            screen2 = Screen(TransposedPyScreen(pyScreen, 580, 50, 0.5, 0.5), black2)
+            game2 = GameRunner()
+            game2.run(screen2, world, player2)
+
             pygame.display.flip()
 
-            time.sleep(0.01)
+            # Main game loop, on local machine, reading keys etc
+            gameTime = 0
+            gameCtrl.onInitWorld(world)
 
-    finally:
-        pygame.quit()
-        print("Exit")
+            while 1:
+                gameTime = gameTime + 1
+                gameCtrl.onGameTimePasses(world, gameTime)
 
-# Actually run the game
-gameQueue = queue.Queue()
-gameController = GameController()
-gameCtrl = LocalGameController(gameQueue, gameController)
-playGame(gameCtrl)
+                # Drain event queue and check for user actions
+                for event in pygame.event.get():
+                    et = event.type
+                    if et == pygame.QUIT or (et == pygame.KEYDOWN and event.key == pygame.K_ESCAPE): sys.exit()
+                    if et == pygame.KEYDOWN:
+                        world.playersReactToKey(gameCtrl, event.key)
+
+                world.processQueuedActions(gameCtrl.gameQueue)
+
+                game1.runLoop()
+                game2.runLoop()
+                pygame.display.flip()
+
+                time.sleep(0.01)
+
+        finally:
+            pygame.quit()
+            print("Exit")
+
+    def run(self):
+        # Actually run the game
+        gameQueue = queue.Queue()
+        gameController = GameController()
+        gameCtrl = LocalGameController(gameQueue, gameController)
+        self.playGame(gameCtrl)
+
+Main().run()
